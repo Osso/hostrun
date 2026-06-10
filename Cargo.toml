@@ -1,0 +1,32 @@
+[package]
+name = "hostrun"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Stateful QuickJS host-automation runtime with a stdio MCP server."
+readme = "README.md"
+
+[dependencies]
+rquickjs = { version = "0.11.0", features = ["parallel"] }
+reqwest = { version = "0.12.28", features = ["blocking", "json", "multipart"] }
+rmcp = { version = "0.15.0", default-features = false, features = ["server"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9.34"
+thiserror = "2"
+glob = "0.3.3"
+tokio = { version = "1.52.3", features = ["io-std", "io-util", "macros", "rt-multi-thread"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lib]
+doctest = false
+
+[[bin]]
+name = "hostrun-mcp"
+path = "src/bin/mcp.rs"
+
+[[bin]]
+name = "codex-hostrun-mcp"
+path = "src/bin/codex_hostrun_mcp.rs"
