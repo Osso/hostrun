@@ -179,6 +179,24 @@ tools.sudo(cli.dmidecode('-t', 'system').stdout.capture()).run();
 
 `cli.sudo(...)` and `run.sudo(...)` invoke the `sudo` binary literally. They do not use `authsudo`.
 
+## Tmux
+
+`tools.tmux` wraps common tmux session and pane actions while keeping execution
+inside the normal approval-gated command builder path.
+
+```js
+tools.tmux.open('work', { cwd: '/repo', command: 'zsh' });
+tools.tmux.send('work', 'cargo test');
+tools.tmux.capture('work', { start: -80 }).stdout;
+tools.tmux.close('work');
+```
+
+`send()` uses `send-keys -l` plus `Enter` by default, so the command text is sent
+literally. Pass `{ enter: false }` to leave it at the prompt, or
+`{ literal: false }` when you intentionally want tmux key names. Use
+`tools.tmux.command(...args)` for raw tmux subcommands and
+`tools.tmux.with({ executable: '/path/to/tmux' })` for custom tmux binaries.
+
 ## SSH Commands
 
 `tools.ssh(options)` wraps OpenSSH for remote `cli.*` command builders. `.run(command)` captures stdout and stderr by default:
@@ -441,7 +459,7 @@ Claude Code can register the built binary as the `hostrun` MCP server. The serve
 
 ## Tests
 
-Run Hostrun tests from `codex-rs`:
+Run Hostrun tests from the standalone repository:
 
 ```bash
 cargo test

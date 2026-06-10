@@ -2397,6 +2397,83 @@ globalThis.github = {
 
 globalThis.tools.github = globalThis.github;
 
+globalThis.__hostrun_tmuxTarget = function (target) {
+  if (target === undefined || target === null || String(target).length === 0) {
+    throw new Error("tools.tmux requires a target session, window, or pane");
+  }
+  return String(target);
+};
+
+globalThis.__hostrun_tmuxAddTarget = function (args, target) {
+  args.push("-t", globalThis.__hostrun_tmuxTarget(target));
+};
+
+globalThis.__hostrun_tmuxBuild = function (options, args) {
+  const executable = options.executable === undefined || options.executable === null
+    ? "tmux"
+    : String(options.executable);
+  return globalThis.__hostrun_commandBuilder(executable, args);
+};
+
+globalThis.__hostrun_tmuxTools = function (defaults = {}) {
+  return {
+    with: function (options = {}) {
+      return globalThis.__hostrun_tmuxTools({ ...defaults, ...options });
+    },
+
+    command: function (...args) {
+      return globalThis.__hostrun_tmuxBuild(defaults, args);
+    },
+
+    open: function (name, options = {}) {
+      if (name === undefined || name === null || String(name).length === 0) {
+        throw new Error("tools.tmux.open requires a session name");
+      }
+      const args = ["new-session", "-d", "-s", String(name)];
+      globalThis.__hostrun_addOption(args, "-c", options.cwd);
+      if (options.command !== undefined && options.command !== null) {
+        args.push(String(options.command));
+      }
+      return globalThis.__hostrun_tmuxBuild({ ...defaults, ...options }, args).run();
+    },
+
+    close: function (target, options = {}) {
+      const args = ["kill-session"];
+      globalThis.__hostrun_tmuxAddTarget(args, target);
+      return globalThis.__hostrun_tmuxBuild({ ...defaults, ...options }, args).run();
+    },
+
+    send: function (target, command, options = {}) {
+      if (command === undefined || command === null) {
+        throw new Error("tools.tmux.send requires a command string");
+      }
+      const args = ["send-keys"];
+      globalThis.__hostrun_tmuxAddTarget(args, target);
+      if (options.literal !== false) {
+        args.push("-l");
+      }
+      args.push(String(command));
+      if (options.enter !== false) {
+        args.push("Enter");
+      }
+      return globalThis.__hostrun_tmuxBuild({ ...defaults, ...options }, args).run();
+    },
+
+    capture: function (target, options = {}) {
+      const args = ["capture-pane", "-p"];
+      globalThis.__hostrun_tmuxAddTarget(args, target);
+      globalThis.__hostrun_addOption(args, "-S", options.start);
+      globalThis.__hostrun_addOption(args, "-E", options.end);
+      globalThis.__hostrun_addOption(args, "-J", options.joinWrappedLines);
+      globalThis.__hostrun_addOption(args, "-e", options.escapeSequences);
+      return globalThis.__hostrun_tmuxBuild({ ...defaults, ...options }, args).stdout.text();
+    }
+  };
+};
+
+globalThis.tmux = globalThis.__hostrun_tmuxTools();
+globalThis.tools.tmux = globalThis.tmux;
+
 globalThis.fd = {
   find: function (pattern, options = {}) {
     const args = [pattern];

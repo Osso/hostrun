@@ -126,6 +126,108 @@ fn tools_sudo_preserves_command_builder_io_overrides() {
 }
 
 #[test]
+fn tools_tmux_open_returns_new_session_approval() {
+    let session = HostrunSession::new().expect("session");
+
+    let result = session
+        .eval("tools.tmux.open('work', { cwd: '/tmp/project', command: 'nvim' });")
+        .expect("approval");
+
+    let approval = result.approval.expect("approval");
+    assert_eq!(approval.tool, "cli.tmux");
+    assert_eq!(
+        approval.args,
+        json!({
+            "program": "tmux",
+            "args": ["new-session", "-d", "-s", "work", "-c", "/tmp/project", "nvim"]
+        })
+    );
+}
+
+#[test]
+fn tools_tmux_close_returns_kill_session_approval() {
+    let session = HostrunSession::new().expect("session");
+
+    let result = session
+        .eval("tools.tmux.close('work:1.2');")
+        .expect("approval");
+
+    let approval = result.approval.expect("approval");
+    assert_eq!(approval.tool, "cli.tmux");
+    assert_eq!(
+        approval.args,
+        json!({
+            "program": "tmux",
+            "args": ["kill-session", "-t", "work:1.2"]
+        })
+    );
+}
+
+#[test]
+fn tools_tmux_send_uses_literal_keys_and_enter_by_default() {
+    let session = HostrunSession::new().expect("session");
+
+    let result = session
+        .eval("tools.tmux.send('work', 'cargo test');")
+        .expect("approval");
+
+    let approval = result.approval.expect("approval");
+    assert_eq!(approval.tool, "cli.tmux");
+    assert_eq!(
+        approval.args,
+        json!({
+            "program": "tmux",
+            "args": ["send-keys", "-t", "work", "-l", "cargo test", "Enter"]
+        })
+    );
+}
+
+#[test]
+fn tools_tmux_capture_requests_stdout_text() {
+    let session = HostrunSession::new().expect("session");
+
+    let result = session
+        .eval("tools.tmux.capture('work', { start: -40, end: -1, joinWrappedLines: true });")
+        .expect("approval");
+
+    let approval = result.approval.expect("approval");
+    assert_eq!(approval.tool, "cli.tmux");
+    assert_eq!(
+        approval.args,
+        json!({
+            "program": "tmux",
+            "args": ["capture-pane", "-p", "-t", "work", "-S", "-40", "-E", "-1", "-J"],
+            "stdout": { "type": "text" }
+        })
+    );
+}
+
+#[test]
+fn tools_tmux_capture_returns_command_stdout() {
+    let session = HostrunSession::new_auto_approve().expect("session");
+
+    let result = session
+        .eval("tools.tmux.with({ executable: 'printf' }).capture('work');")
+        .expect("tmux capture");
+
+    assert_eq!(
+        result.value,
+        Some(json!({
+            "program": "printf",
+            "args": ["capture-pane", "-p", "-t", "work"],
+            "success": true,
+            "exitCode": 0,
+            "stdout": "capture-pane",
+            "stdoutMeta": {
+                "bytes": 12,
+                "capturedBytes": 12,
+                "truncated": false
+            }
+        }))
+    );
+}
+
+#[test]
 fn command_builder_env_is_redacted_in_approval() {
     let session = HostrunSession::new().expect("session");
 
