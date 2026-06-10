@@ -1,4 +1,5 @@
 use serde_json::json;
+use tempfile::TempDir;
 
 use super::HostrunSession;
 
@@ -223,6 +224,60 @@ fn tools_tmux_capture_returns_command_stdout() {
                 "capturedBytes": 12,
                 "truncated": false
             }
+        }))
+    );
+}
+
+#[test]
+fn tools_tmux_run_extracts_last_marked_output() {
+    let session = HostrunSession::new().expect("session");
+
+    let result = session
+        .eval(
+            r#"
+            __hostrun_tmuxExtractRunResult(
+              "$ printf __HOSTRUN_TMUX_START_1__ __HOSTRUN_TMUX_END_1__\n__HOSTRUN_TMUX_START_1__\nfile-a\nfile-b\n__HOSTRUN_TMUX_END_1__:7\n",
+              "__HOSTRUN_TMUX_START_1__",
+              "__HOSTRUN_TMUX_END_1__"
+            )
+            "#,
+        )
+        .expect("extract result");
+
+    assert_eq!(
+        result.value,
+        Some(json!({
+            "stdout": "file-a\nfile-b",
+            "exitCode": 7
+        }))
+    );
+}
+
+#[test]
+fn tools_tmux_run_sends_command_and_returns_output() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    let fake_tmux = temp_dir.path().join("tmux");
+    std::fs::write(
+        &fake_tmux,
+        "#!/bin/sh\nif [ \"$1\" = \"capture-pane\" ]; then\n  printf '%s\\n' '__HOSTRUN_TMUX_START_1__' 'remote-a' 'remote-b' '__HOSTRUN_TMUX_END_1__:0'\nfi\n",
+    )
+    .expect("write fake tmux");
+    make_executable(&fake_tmux);
+    let session = HostrunSession::new_auto_approve().expect("session");
+
+    let result = session
+        .eval(&format!(
+            "tools.tmux.with({{ executable: '{}' }}).run('work', 'ls', {{ pollMs: 0 }})",
+            fake_tmux.display()
+        ))
+        .expect("tmux run");
+
+    assert_eq!(
+        result.value,
+        Some(json!({
+            "stdout": "remote-a\nremote-b",
+            "exitCode": 0,
+            "timedOut": false
         }))
     );
 }
@@ -573,6 +628,20 @@ fn assert_dmidecode_approval(approval: super::HostrunApprovalRequest) {
         })
     );
 }
+
+#[cfg(unix)]
+fn make_executable(path: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut permissions = std::fs::metadata(path)
+        .expect("fake tmux metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(path, permissions).expect("fake tmux permissions");
+}
+
+#[cfg(not(unix))]
+fn make_executable(_path: &std::path::Path) {}
 
 #[test]
 fn sqlite_query_wrapper_builds_json_sqlite_command() {

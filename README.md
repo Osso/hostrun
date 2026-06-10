@@ -188,13 +188,17 @@ inside the normal approval-gated command builder path.
 tools.tmux.open('work', { cwd: '/repo', command: 'zsh' });
 tools.tmux.send('work', 'cargo test');
 tools.tmux.capture('work', { start: -80 }).stdout;
+tools.tmux.run('work', 'ls -la');
 tools.tmux.close('work');
 ```
 
 `send()` uses `send-keys -l` plus `Enter` by default, so the command text is sent
 literally. Pass `{ enter: false }` to leave it at the prompt, or
 `{ literal: false }` when you intentionally want tmux key names. Use
-`tools.tmux.command(...args)` for raw tmux subcommands and
+`capture()` to read existing pane output without sending anything.
+`run(target, command, options)` sends a shell command wrapped with start/end
+markers, polls `capture-pane`, and returns `{ stdout, exitCode, timedOut }`.
+Use `tools.tmux.command(...args)` for raw tmux subcommands and
 `tools.tmux.with({ executable: '/path/to/tmux' })` for custom tmux binaries.
 
 ## SSH Commands

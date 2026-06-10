@@ -2415,6 +2415,44 @@ globalThis.__hostrun_tmuxBuild = function (options, args) {
   return globalThis.__hostrun_commandBuilder(executable, args);
 };
 
+globalThis.__hostrun_tmuxRunCounter = globalThis.__hostrun_tmuxRunCounter ?? 0;
+
+globalThis.__hostrun_escapeRegex = function (value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
+
+globalThis.__hostrun_tmuxRunScript = function (command, startMarker, endMarker) {
+  return [
+    "printf '\\n%s\\n' " + globalThis.__hostrun_shellQuote(startMarker),
+    "{ " + String(command) + "; }",
+    "__hostrun_tmux_status=$?",
+    "printf '\\n%s:%s\\n' " + globalThis.__hostrun_shellQuote(endMarker) + " \"$__hostrun_tmux_status\""
+  ].join("; ");
+};
+
+globalThis.__hostrun_trimTmuxRunOutput = function (output) {
+  return String(output).replace(/^\r?\n/, "").replace(/\r?\n$/, "");
+};
+
+globalThis.__hostrun_tmuxExtractRunResult = function (text, startMarker, endMarker) {
+  const output = String(text);
+  const endIndex = output.lastIndexOf(endMarker + ":");
+  if (endIndex === -1) {
+    return null;
+  }
+  const beforeEnd = output.slice(0, endIndex);
+  const startIndex = beforeEnd.lastIndexOf(startMarker);
+  if (startIndex === -1) {
+    return null;
+  }
+  const statusPattern = new RegExp(globalThis.__hostrun_escapeRegex(endMarker) + ":(\\d+)");
+  const statusMatch = output.slice(endIndex).match(statusPattern);
+  return {
+    stdout: globalThis.__hostrun_trimTmuxRunOutput(beforeEnd.slice(startIndex + startMarker.length)),
+    exitCode: statusMatch ? Number(statusMatch[1]) : null
+  };
+};
+
 globalThis.__hostrun_tmuxTools = function (defaults = {}) {
   return {
     with: function (options = {}) {
@@ -2457,6 +2495,37 @@ globalThis.__hostrun_tmuxTools = function (defaults = {}) {
         args.push("Enter");
       }
       return globalThis.__hostrun_tmuxBuild({ ...defaults, ...options }, args).run();
+    },
+
+    run: function (target, command, options = {}) {
+      if (command === undefined || command === null) {
+        throw new Error("tools.tmux.run requires a command string");
+      }
+      globalThis.__hostrun_tmuxRunCounter += 1;
+      const token = String(globalThis.__hostrun_tmuxRunCounter);
+      const startMarker = "__HOSTRUN_TMUX_START_" + token + "__";
+      const endMarker = "__HOSTRUN_TMUX_END_" + token + "__";
+      const timeoutMs = Number(options.timeoutMs ?? 10000);
+      const pollMs = Number(options.pollMs ?? 250);
+      const startedAt = Date.now();
+      const tmux = globalThis.__hostrun_tmuxTools({ ...defaults, ...options });
+      tmux.send(target, globalThis.__hostrun_tmuxRunScript(command, startMarker, endMarker));
+      let capture = null;
+      while (Date.now() - startedAt <= timeoutMs) {
+        capture = tmux.capture(target, options.capture ?? {});
+        const parsed = globalThis.__hostrun_tmuxExtractRunResult(capture.stdout ?? "", startMarker, endMarker);
+        if (parsed !== null) {
+          return { ...parsed, timedOut: false };
+        }
+        if (pollMs > 0) {
+          run.sleep(String(Math.max(0.001, pollMs / 1000)));
+        }
+      }
+      return {
+        stdout: capture?.stdout ?? "",
+        exitCode: null,
+        timedOut: true
+      };
     },
 
     capture: function (target, options = {}) {
