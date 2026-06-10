@@ -12,13 +12,25 @@ notifications instead.
 
 ## Claude Code MCP
 
-Build the MCP server binary:
+Install the MCP server binary from the public repository:
+
+```sh
+cargo install --git https://github.com/Osso/hostrun --bin hostrun-mcp
+```
+
+Add it to Claude Code as a user-scoped stdio MCP server:
+
+```sh
+claude mcp add --scope user hostrun -- hostrun-mcp
+```
+
+For a local checkout, build the MCP server binary:
 
 ```sh
 cargo build --bin hostrun-mcp
 ```
 
-Add it to Claude Code as a local stdio MCP server:
+Then point Claude Code at the built binary:
 
 ```sh
 claude mcp add --scope user hostrun -- /path/to/hostrun-mcp
@@ -48,7 +60,7 @@ automatically.
 
 ## Standalone Repository Extraction
 
-This crate is shaped so it can move to a standalone Hostrun repository:
+This crate is the standalone Hostrun repository:
 
 - Runtime and MCP code live here, without Codex extension/tool dependencies.
 - Codex-specific tool contribution and native exec/progress display mapping stay
