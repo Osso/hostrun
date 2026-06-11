@@ -160,9 +160,13 @@ fn mcp_execution_context(context: RequestContext<RoleServer>) -> HostrunExecutio
     let peer = context.peer.clone();
     let progress_token = context.meta.get_progress_token();
     let progress = Arc::new(AtomicU64::new(0));
+    // The sink is called from std::thread output readers, where tokio::spawn
+    // would panic; capture the runtime handle while still in async context.
+    let runtime = tokio::runtime::Handle::current();
     HostrunExecutionContext::new(move || cancellation_token.is_cancelled()).with_output_sink(
         move |delta| {
             spawn_mcp_output_notification(
+                runtime.clone(),
                 peer.clone(),
                 progress_token.clone(),
                 Arc::clone(&progress),
@@ -181,13 +185,14 @@ fn mcp_stream_name(stream: HostrunOutputStream) -> &'static str {
 }
 
 fn spawn_mcp_output_notification(
+    runtime: tokio::runtime::Handle,
     peer: rmcp::Peer<RoleServer>,
     progress_token: Option<rmcp::model::ProgressToken>,
     progress: Arc<AtomicU64>,
     stream: &'static str,
     chunk: String,
 ) {
-    tokio::spawn(async move {
+    runtime.spawn(async move {
         notify_mcp_log(&peer, stream, &chunk).await;
         notify_mcp_progress(&peer, progress_token, progress, stream, &chunk).await;
     });
