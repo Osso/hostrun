@@ -80,6 +80,13 @@ impl HostrunMcpServer {
         }
     }
 
+    pub fn new_auto_approve() -> Self {
+        Self {
+            sessions: Arc::new(Mutex::new(HostrunSessionStore::new_auto_approve())),
+            tools: Arc::new(vec![hostrun_eval_tool()]),
+        }
+    }
+
     fn eval(
         &self,
         args: HostrunEvalArgs,
@@ -234,6 +241,15 @@ async fn notify_mcp_progress(
 
 pub async fn run_stdio_server() -> Result<(), Box<dyn std::error::Error>> {
     let server = HostrunMcpServer::new().serve(stdio()).await?;
+    server.waiting().await?;
+    Ok(())
+}
+
+/// For harnesses (codex, Claude Code) that gate tool calls with their own
+/// permission layer; the MCP server has no channel to deliver approvals, so
+/// PendingApproval mode would dead-end every host operation.
+pub async fn run_stdio_server_auto_approve() -> Result<(), Box<dyn std::error::Error>> {
+    let server = HostrunMcpServer::new_auto_approve().serve(stdio()).await?;
     server.waiting().await?;
     Ok(())
 }
