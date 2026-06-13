@@ -1380,6 +1380,15 @@ globalThis.__hostrun_loadModule = function (name, loader) {
   throw new Error("tools.require loader must be a function or file path string for " + name);
 };
 
+globalThis.__hostrun_builtinModuleLoaders = {
+  sheetjs: function (module, exports) {
+    const runModule = globalThis.eval("(function(module, exports) {\n" + globalThis.__hostrun_sheetjsSource + "\n})");
+    const result = runModule(module, exports);
+    return result === undefined ? module.exports : result;
+  }
+};
+globalThis.__hostrun_builtinModuleLoaders.xlsx = globalThis.__hostrun_builtinModuleLoaders.sheetjs;
+
 globalThis.tools.require = function (name, loader = undefined) {
   if (!name || typeof name !== "string") {
     throw new Error("tools.require requires a non-empty module name");
@@ -1388,6 +1397,10 @@ globalThis.tools.require = function (name, loader = undefined) {
   const store = globalThis.__hostrun_moduleStore();
   if (Object.prototype.hasOwnProperty.call(store.modules, name)) {
     return store.modules[name];
+  }
+
+  if ((loader === undefined || loader === null) && Object.prototype.hasOwnProperty.call(globalThis.__hostrun_builtinModuleLoaders, name)) {
+    loader = globalThis.__hostrun_builtinModuleLoaders[name];
   }
 
   if (loader === undefined || loader === null) {

@@ -167,6 +167,7 @@ impl HostrunSession {
                         invoker.invoke_tool(&tool_path, &args_json)
                     })?;
                 globals.set("__hostrun_invokeTool", invoke_tool)?;
+                globals.set("__hostrun_sheetjsSource", SHEETJS_XLSX_FULL_MIN_JS)?;
                 ctx.eval::<(), _>(HOSTRUN_BOOTSTRAP)
             })
             .map_err(HostrunSessionError::from_quickjs)
@@ -639,10 +640,15 @@ impl Default for HostrunSessionStore {
 }
 
 const HOSTRUN_BOOTSTRAP: &str = include_str!("bootstrap.js");
+const SHEETJS_XLSX_FULL_MIN_JS: &str = include_str!("vendor/sheetjs-xlsx-0.18.5.full.min.js");
 
 #[cfg(test)]
 #[path = "session_tests.rs"]
 mod session_tests;
+
+#[cfg(test)]
+#[path = "require_tests.rs"]
+mod require_tests;
 
 #[cfg(test)]
 #[path = "projection_tests.rs"]

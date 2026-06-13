@@ -84,12 +84,14 @@ ctx.files.length;
 Use `tools.require(name, loader)` for helper modules that should load lazily and stay cached in `ctx` for the rest of the session. The loader can be a function or a file path; file loaders use approval-gated `fs.read()`:
 
 ```js
-const xlsx = tools.require('xlsx', '/path/to/xlsx-hostrun.js');
+const xlsx = tools.require('sheetjs');
 const helpers = tools.require('helpers', (module) => {
   module.exports = { trim: (value) => String(value).trim() };
 });
 tools.require('helpers').trim('  ok  ');
 ```
+
+`sheetjs` and `xlsx` are built-in aliases for the vendored SheetJS `xlsx` browser bundle. Other module names require a loader the first time they are used.
 
 Console calls are captured in the result:
 
