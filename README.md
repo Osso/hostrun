@@ -81,6 +81,16 @@ ctx.files = rg.files('Hostrun', ['src']).lines();
 ctx.files.length;
 ```
 
+Use `tools.require(name, loader)` for helper modules that should load lazily and stay cached in `ctx` for the rest of the session. The loader can be a function or a file path; file loaders use approval-gated `fs.read()`:
+
+```js
+const xlsx = tools.require('xlsx', '/path/to/xlsx-hostrun.js');
+const helpers = tools.require('helpers', (module) => {
+  module.exports = { trim: (value) => String(value).trim() };
+});
+tools.require('helpers').trim('  ok  ');
+```
+
 Console calls are captured in the result:
 
 ```js

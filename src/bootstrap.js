@@ -1355,6 +1355,53 @@ globalThis.__hostrun_toolProxy = function (path) {
 
 globalThis.tools = globalThis.__hostrun_toolProxy("");
 
+globalThis.__hostrun_moduleStore = function () {
+  globalThis.ctx.__hostrunModules = globalThis.ctx.__hostrunModules ?? Object.create(null);
+  globalThis.ctx.__hostrunModuleMeta = globalThis.ctx.__hostrunModuleMeta ?? Object.create(null);
+  return {
+    modules: globalThis.ctx.__hostrunModules,
+    meta: globalThis.ctx.__hostrunModuleMeta
+  };
+};
+
+globalThis.__hostrun_loadModule = function (name, loader) {
+  const module = { exports: {} };
+  const exports = module.exports;
+  if (typeof loader === "function") {
+    const result = loader(module, exports);
+    return result === undefined ? module.exports : result;
+  }
+  if (typeof loader === "string") {
+    const source = globalThis.fs.read(loader);
+    const runModule = globalThis.eval("(function(module, exports) {\n" + source + "\n})");
+    const result = runModule(module, exports);
+    return result === undefined ? module.exports : result;
+  }
+  throw new Error("tools.require loader must be a function or file path string for " + name);
+};
+
+globalThis.tools.require = function (name, loader = undefined) {
+  if (!name || typeof name !== "string") {
+    throw new Error("tools.require requires a non-empty module name");
+  }
+
+  const store = globalThis.__hostrun_moduleStore();
+  if (Object.prototype.hasOwnProperty.call(store.modules, name)) {
+    return store.modules[name];
+  }
+
+  if (loader === undefined || loader === null) {
+    throw new Error("tools.require module is not loaded: " + name);
+  }
+
+  store.modules[name] = globalThis.__hostrun_loadModule(name, loader);
+  store.meta[name] = {
+    loadedAt: new Date().toISOString(),
+    source: typeof loader === "string" ? loader : "function"
+  };
+  return store.modules[name];
+};
+
 globalThis.host = {
   cwd: function () {
     return globalThis.__hostrun_invokeCapability("host.cwd", {});
