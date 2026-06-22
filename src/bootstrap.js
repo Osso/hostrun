@@ -2545,16 +2545,28 @@ globalThis.__hostrun_tmuxTools = function (defaults = {}) {
       if (command === undefined || command === null) {
         throw new Error("tools.tmux.send requires a command string");
       }
+      const buildOptions = { ...defaults, ...options };
       const args = ["send-keys"];
       globalThis.__hostrun_tmuxAddTarget(args, target);
-      if (options.literal !== false) {
+      const literal = options.literal !== false;
+      if (literal) {
         args.push("-l");
       }
       args.push(String(command));
+      // In literal (-l) mode tmux types every following argument verbatim, so
+      // "Enter" would be typed as text rather than pressing the Enter key.
+      // Send the Enter keypress as a separate send-keys call without -l.
+      if (options.enter !== false && literal) {
+        globalThis.__hostrun_tmuxBuild(buildOptions, args).run();
+        const enterArgs = ["send-keys"];
+        globalThis.__hostrun_tmuxAddTarget(enterArgs, target);
+        enterArgs.push("Enter");
+        return globalThis.__hostrun_tmuxBuild(buildOptions, enterArgs).run();
+      }
       if (options.enter !== false) {
         args.push("Enter");
       }
-      return globalThis.__hostrun_tmuxBuild({ ...defaults, ...options }, args).run();
+      return globalThis.__hostrun_tmuxBuild(buildOptions, args).run();
     },
 
     run: function (target, command, options = {}) {

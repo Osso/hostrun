@@ -174,11 +174,67 @@ fn tools_tmux_send_uses_literal_keys_and_enter_by_default() {
 
     let approval = result.approval.expect("approval");
     assert_eq!(approval.tool, "cli.tmux");
+    // In literal (-l) mode the Enter keypress must be a separate send-keys
+    // call, otherwise tmux types the word "Enter" instead of pressing it.
+    // This first approval is the literal command text without Enter.
     assert_eq!(
         approval.args,
         json!({
             "program": "tmux",
-            "args": ["send-keys", "-t", "work", "-l", "cargo test", "Enter"]
+            "args": ["send-keys", "-t", "work", "-l", "cargo test"]
+        })
+    );
+}
+
+#[test]
+fn tools_tmux_send_literal_presses_enter_in_separate_call() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    let fake_tmux = temp_dir.path().join("tmux");
+    let log = temp_dir.path().join("calls.log");
+    std::fs::write(
+        &fake_tmux,
+        format!(
+            "#!/bin/sh\nprintf '%s\\n' \"$*\" >> '{}'\n",
+            log.display()
+        ),
+    )
+    .expect("write fake tmux");
+    make_executable(&fake_tmux);
+    let session = HostrunSession::new_auto_approve().expect("session");
+
+    session
+        .eval(&format!(
+            "tools.tmux.with({{ executable: '{}' }}).send('work', 'cargo test')",
+            fake_tmux.display()
+        ))
+        .expect("tmux send");
+
+    let calls = std::fs::read_to_string(&log).expect("read calls log");
+    let lines: Vec<&str> = calls.lines().collect();
+    assert_eq!(
+        lines,
+        vec![
+            "send-keys -t work -l cargo test",
+            "send-keys -t work Enter"
+        ]
+    );
+}
+
+#[test]
+fn tools_tmux_send_non_literal_keeps_single_call() {
+    let session = HostrunSession::new().expect("session");
+
+    let result = session
+        .eval("tools.tmux.send('work', 'C-c', { literal: false });")
+        .expect("approval");
+
+    let approval = result.approval.expect("approval");
+    assert_eq!(approval.tool, "cli.tmux");
+    assert_eq!(
+        approval.args,
+        json!({
+            "program": "tmux",
+            "args": ["send-keys", "-t", "work", "C-c", "Enter"]
         })
     );
 }
