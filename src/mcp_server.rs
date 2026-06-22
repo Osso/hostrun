@@ -46,6 +46,8 @@ Use tools.browser for browser-cli Chrome/CDP automation: tools.browser.open(url)
 Use tools.ssh({ host, user, password, passwordMode: 'plain' }).run(cli.hostname()) for OpenSSH remote commands with an explicit non-secret plain password through sshpass -e. Use .cli(command).text() when choosing output handling. Compose Windows remotes with tools.powershell(script) to use powershell -NoProfile -EncodedCommand and avoid nested quoting for paths with spaces. \
 Common git/GitHub shortcuts: tools.git.status({ cwd }); tools.github.prView({ repo, pr }); tools.github.runView({ repo, run }); tools.git.commit(options); tools.github.createPR(options). \
 Prefer Hostrun JavaScript over Bash(...) for multi-command workflows with pipes, command substitution, grep, wc, sort, base64, HTTP polling, retries, or response parsing. Use cli.* stdout selectors plus JavaScript filtering/counting/sorting. \
+For MariaDB/MySQL client tools, do not assume MYSQL_PWD or MARIADB_PWD will be honored through Hostrun; verify with SELECT 1 first. If the client reports using password: NO, use a credential file or a direct -p... argument inside Hostrun while not printing or returning the command/result object. \
+For large SQL imports, do not read the full SQL file into JavaScript just to feed stdin; pipe a command builder stream instead, for example cli.mariadb(...).stdin(cli.cat('/tmp/schema.sql').stdout).stdout.capture().stderr.capture().run(). \
 Polling example: for (let i = 0; i < 30; i++) { const html = http.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, tls: { acceptInvalidCerts: true } }).text(); const tag = html.match(/<script type=\"module\" src=\"[^\"]*bundle[^\"]*\"/)?.[0] ?? ''; if (tag.includes('globalcomix-frontend.nyc3.cdn')) { tag; break; } run.sleep('2'); } \
 Kubernetes/rclone example: const secret = kubectl.get('secret', { name: 'ipg-import', namespace: 'ops' }).json(); const key = cli.base64('-d').stdin.text(secret.data.DO_SPACES_ACCESS_KEY).text().trim(); const files = cli.rclone('lsf', remote).lines().filter((line) => line.endsWith('.xml') || line.endsWith('.onix')); \
 Correct command examples: run.dmidecode('-t', 'system'); cli.git('status').in('/repo').stdout.text(); tools.sudo(cli.dmidecode('-t', 'system')).run(). \
@@ -368,6 +370,9 @@ mod tests {
         assert!(description.contains("Do not use await"));
         assert!(description.contains("Prefer Hostrun JavaScript over Bash(...)"));
         assert!(description.contains("grep, wc, sort, base64"));
+        assert!(description.contains("MYSQL_PWD or MARIADB_PWD"));
+        assert!(description.contains("using password: NO"));
+        assert!(description.contains("cli.mariadb(...).stdin(cli.cat('/tmp/schema.sql').stdout)"));
         assert!(description.contains("Kubernetes/rclone example"));
         assert!(description.contains("acceptInvalidCerts"));
         assert!(description.contains("tools.browser.open(url).run()"));
