@@ -65,8 +65,11 @@ This crate is the standalone Hostrun repository:
 - Runtime and MCP code live here, without Codex extension/tool dependencies.
 - Codex-specific tool contribution and native exec/progress display mapping stay
   in `codex-hostrun-adapter` in the Codex repository.
-- `hostrun-mcp` is the standalone stdio MCP binary. `codex-hostrun-mcp` remains
-  as a compatibility alias for the transition from the Codex workspace.
+- `hostrun-mcp` is the standalone stdio MCP binary. It runs in AutoApprove mode,
+  since the stdio transport has no channel to deliver approvals back to the
+  harness (Claude Code / Codex gate tool calls in their own permission layer).
+  Codex links the `hostrun` lib directly via `codex-hostrun-adapter` and never
+  spawns this binary, so no separate Codex binary is needed.
 - `hostrun-jsonl` is the non-MCP adapter runner for hosts such as Pi that need a
   process boundary but should not speak MCP for their built-in Hostrun tool.
 - Preserve focused verification: `cargo test`, `cargo build --bin hostrun-mcp`,

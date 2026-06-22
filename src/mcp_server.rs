@@ -243,16 +243,12 @@ async fn notify_mcp_progress(
         .await;
 }
 
+/// Stdio MCP server for harnesses (Claude Code, Codex) that gate tool calls
+/// with their own permission layer. Runs in AutoApprove mode: the MCP transport
+/// has no channel to deliver approvals back, so PendingApproval would dead-end
+/// every host operation. Harnesses that link the lib directly (e.g. codex) build
+/// their own session store and never spawn this binary.
 pub async fn run_stdio_server() -> Result<(), Box<dyn std::error::Error>> {
-    let server = HostrunMcpServer::new().serve(stdio()).await?;
-    server.waiting().await?;
-    Ok(())
-}
-
-/// For harnesses (codex, Claude Code) that gate tool calls with their own
-/// permission layer; the MCP server has no channel to deliver approvals, so
-/// PendingApproval mode would dead-end every host operation.
-pub async fn run_stdio_server_auto_approve() -> Result<(), Box<dyn std::error::Error>> {
     let server = HostrunMcpServer::new_auto_approve().serve(stdio()).await?;
     server.waiting().await?;
     Ok(())

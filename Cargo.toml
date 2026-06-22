@@ -28,9 +28,5 @@ name = "hostrun-mcp"
 path = "src/bin/mcp.rs"
 
 [[bin]]
-name = "codex-hostrun-mcp"
-path = "src/bin/codex_hostrun_mcp.rs"
-
-[[bin]]
 name = "hostrun-jsonl"
 path = "src/bin/jsonl.rs"
