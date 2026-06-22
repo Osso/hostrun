@@ -67,8 +67,27 @@ This crate is the standalone Hostrun repository:
   in `codex-hostrun-adapter` in the Codex repository.
 - `hostrun-mcp` is the standalone stdio MCP binary. `codex-hostrun-mcp` remains
   as a compatibility alias for the transition from the Codex workspace.
+- `hostrun-jsonl` is the non-MCP adapter runner for hosts such as Pi that need a
+  process boundary but should not speak MCP for their built-in Hostrun tool.
 - Preserve focused verification: `cargo test`, `cargo build --bin hostrun-mcp`,
-  and Codex adapter progress-display tests in the Codex repository.
+  `cargo build --bin hostrun-jsonl`, and Codex adapter progress-display tests in
+  the Codex repository.
+
+## JSONL Adapter Runner
+
+`hostrun-jsonl` reads one JSON request per line from stdin and writes one JSON
+result per line to stdout. It keeps a persistent `HostrunSessionStore` inside
+the process, so repeated requests with the same `session_id` share `ctx`.
+
+```sh
+printf '%s\n' \
+  '{"session_id":"s","code":"ctx.count = 41; ctx.count;"}' \
+  '{"session_id":"s","code":"ctx.count += 1; ctx.count;"}' |
+  hostrun-jsonl
+```
+
+Hosts use this runner when they have their own native tool/approval UI and need
+an adapter boundary without MCP framing.
 
 ## Runtime
 
