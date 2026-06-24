@@ -323,6 +323,38 @@ mod tests {
     }
 
     #[test]
+    fn approved_approval_decision_has_no_reason() {
+        let decision = ApprovalDecision::approve();
+
+        let value = serde_json::to_value(decision).expect("approval decision serializes");
+
+        assert_eq!(
+            value,
+            json!({
+                "approved": true,
+                "reason": null
+            })
+        );
+    }
+
+    #[test]
+    fn eval_result_completed_serializes_output() {
+        let result = EvalResult::completed("stdout", "stderr", 7);
+
+        let value = serde_json::to_value(result).expect("eval result serializes");
+
+        assert_eq!(
+            value,
+            json!({
+                "type": "completed",
+                "stdout": "stdout",
+                "stderr": "stderr",
+                "exit_code": 7
+            })
+        );
+    }
+
+    #[test]
     fn eval_result_can_pause_for_approval() {
         let result = EvalResult::needs_approval(ApprovalRequest::new(
             ApprovalRequestId::new("approval-1"),

@@ -129,3 +129,114 @@ fn field_as_string(args: &Value, field: &str) -> String {
         .unwrap_or_default()
         .to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::Map;
+    use tempfile::tempdir;
+
+    #[test]
+    fn capture_and_lines_intents_record_metadata() {
+        let cwd = tempdir().unwrap();
+        let mut result = Map::new();
+
+        apply_output_intent(
+            &mut result,
+            "stdout",
+            Some(&json!({"type": "capture"})),
+            b"one\ntwo\n",
+            cwd.path(),
+        )
+        .unwrap();
+        apply_output_intent(
+            &mut result,
+            "stderr",
+            Some(&json!({"type": "lines"})),
+            b"err\nwarn\n",
+            cwd.path(),
+        )
+        .unwrap();
+
+        assert_eq!(result["stdout"], json!("one\ntwo\n"));
+        assert_eq!(result["stdoutMeta"]["bytes"], 8);
+        assert_eq!(result["stderr"], json!(["err", "warn"]));
+        assert_eq!(result["stderrMeta"]["truncated"], false);
+    }
+
+    #[test]
+    fn missing_intent_leaves_result_unchanged() {
+        let cwd = tempdir().unwrap();
+        let mut result = Map::new();
+
+        apply_output_intent(&mut result, "stdout", None, b"ignored", cwd.path()).unwrap();
+
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn file_and_tee_intents_write_resolved_paths() {
+        let cwd = tempdir().unwrap();
+        let mut result = Map::new();
+
+        apply_output_intent(
+            &mut result,
+            "stdout",
+            Some(&json!({"type": "file", "path": "out.txt"})),
+            b"saved",
+            cwd.path(),
+        )
+        .unwrap();
+        apply_output_intent(
+            &mut result,
+            "stderr",
+            Some(&json!({"type": "tee", "path": "err.txt"})),
+            b"shown",
+            cwd.path(),
+        )
+        .unwrap();
+
+        assert_eq!(fs::read(cwd.path().join("out.txt")).unwrap(), b"saved");
+        assert_eq!(fs::read(cwd.path().join("err.txt")).unwrap(), b"shown");
+        assert_eq!(result["stdout"]["bytes"], 5);
+        assert_eq!(result["stderr"], json!("shown"));
+        assert_eq!(result["stderrFile"]["bytes"], 5);
+    }
+
+    #[test]
+    fn unsupported_intent_reports_field_name() {
+        let cwd = tempdir().unwrap();
+        let mut result = Map::new();
+
+        let err = apply_output_intent(
+            &mut result,
+            "stderr",
+            Some(&json!({"type": "bad"})),
+            b"",
+            cwd.path(),
+        )
+        .unwrap_err();
+
+        assert!(
+            err.to_string()
+                .contains("unsupported stderr output intent: bad")
+        );
+    }
+
+    #[test]
+    fn file_intent_reports_write_errors() {
+        let cwd = tempdir().unwrap();
+        let mut result = Map::new();
+
+        let err = apply_output_intent(
+            &mut result,
+            "stdout",
+            Some(&json!({"type": "file", "path": "missing/out.txt"})),
+            b"saved",
+            cwd.path(),
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("failed to write stdout"));
+    }
+}

@@ -106,3 +106,102 @@ fn arg_to_string(value: &Value) -> Result<String, HostrunSessionError> {
         ))),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use std::path::Path;
+
+    #[test]
+    fn split_payload_handles_array_null_scalar_and_io_object() {
+        assert_eq!(
+            split_command_payload(json!(["one", 2])).0,
+            vec![json!("one"), json!(2)]
+        );
+        assert_eq!(split_command_payload(Value::Null), (Vec::new(), None));
+        assert_eq!(
+            split_command_payload(json!("--version")),
+            (vec![json!("--version")], None)
+        );
+
+        let (args, io) = split_command_payload(json!({
+            "args": "--json",
+            "stdout": { "type": "capture" }
+        }));
+
+        assert_eq!(args, vec![json!("--json")]);
+        assert_eq!(io, Some(json!({ "stdout": { "type": "capture" } })));
+    }
+
+    #[test]
+    fn command_args_merges_object_io_only() {
+        assert_eq!(
+            command_args("git", vec![json!("status")], Some(json!({"cwd": "/repo"}))),
+            json!({"program": "git", "args": ["status"], "cwd": "/repo"})
+        );
+        assert_eq!(
+            command_args("git", vec![], Some(json!("ignored"))),
+            json!({"program": "git", "args": []})
+        );
+    }
+
+    #[test]
+    fn payload_args_accepts_scalar_values_and_rejects_nested_values() {
+        let payload = json!({"args": ["a", 2, true, null]});
+        let args = payload_args(payload.as_object().unwrap()).unwrap();
+        assert_eq!(args, vec!["a", "2", "true", ""]);
+
+        let payload = json!({"args": [{"bad": true}]});
+        let err = payload_args(payload.as_object().unwrap()).unwrap_err();
+        assert!(err.to_string().contains("scalar argv values"));
+    }
+
+    #[test]
+    fn payload_cwd_defaults_and_validates_string_values() {
+        let session_cwd = Path::new("/tmp/session");
+        let empty = serde_json::Map::new();
+        assert_eq!(payload_cwd(&empty, session_cwd).unwrap(), session_cwd);
+
+        let payload = json!({"cwd": "child"});
+        assert_eq!(
+            payload_cwd(payload.as_object().unwrap(), session_cwd).unwrap(),
+            Path::new("/tmp/session/child")
+        );
+
+        let payload = json!({"cwd": 42});
+        let err = payload_cwd(payload.as_object().unwrap(), session_cwd).unwrap_err();
+        assert!(err.to_string().contains("cwd must be a string"));
+    }
+
+    #[test]
+    fn payload_env_defaults_redacts_and_rejects_non_objects() {
+        let empty = serde_json::Map::new();
+        assert!(payload_env(&empty).unwrap().is_empty());
+
+        let payload = json!({"env": {"TOKEN": "secret", "RETRIES": 3}});
+        let env = payload_env(payload.as_object().unwrap()).unwrap();
+        assert_eq!(
+            env,
+            vec![
+                ("RETRIES".into(), "3".into()),
+                ("TOKEN".into(), "secret".into())
+            ]
+        );
+
+        let mut payload = payload;
+        redact_env_values(&mut payload);
+        assert_eq!(
+            payload["env"],
+            json!({"RETRIES": "[redacted]", "TOKEN": "[redacted]"})
+        );
+
+        let payload = json!({"env": ["TOKEN=secret"]});
+        let err = payload_env(payload.as_object().unwrap()).unwrap_err();
+        assert!(err.to_string().contains("env must be an object"));
+
+        let mut scalar = json!("ignored");
+        redact_env_values(&mut scalar);
+        assert_eq!(scalar, json!("ignored"));
+    }
+}

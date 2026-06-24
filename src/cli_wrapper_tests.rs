@@ -193,10 +193,7 @@ fn tools_tmux_send_literal_presses_enter_in_separate_call() {
     let log = temp_dir.path().join("calls.log");
     std::fs::write(
         &fake_tmux,
-        format!(
-            "#!/bin/sh\nprintf '%s\\n' \"$*\" >> '{}'\n",
-            log.display()
-        ),
+        format!("#!/bin/sh\nprintf '%s\\n' \"$*\" >> '{}'\n", log.display()),
     )
     .expect("write fake tmux");
     make_executable(&fake_tmux);
@@ -213,10 +210,7 @@ fn tools_tmux_send_literal_presses_enter_in_separate_call() {
     let lines: Vec<&str> = calls.lines().collect();
     assert_eq!(
         lines,
-        vec![
-            "send-keys -t work -l cargo test",
-            "send-keys -t work Enter"
-        ]
+        vec!["send-keys -t work -l cargo test", "send-keys -t work Enter"]
     );
 }
 
